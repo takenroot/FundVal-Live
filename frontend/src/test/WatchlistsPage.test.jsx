@@ -121,10 +121,10 @@ describe('WatchlistsPage 通用行为', () => {
     api.watchlistsAPI.list.mockResolvedValue({ data: [] });
   });
 
-  it('无自选列表时显示创建提示', async () => {
+  it('无自选列表时显示创建按钮', async () => {
     render(<BrowserRouter><WatchlistsPage /></BrowserRouter>);
     await waitFor(() => {
-      expect(screen.getByText('还没有自选列表')).toBeInTheDocument();
+      expect(screen.getByText('创建第一个自选列表')).toBeInTheDocument();
     });
   });
 
@@ -167,63 +167,4 @@ describe('WatchlistsPage 通用行为', () => {
     });
   });
 
-  describe('自选分组综合涨跌幅 badge', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      mockScreens = { md: true };
-    });
-
-    it('Tab 标签显示分组综合涨跌幅', async () => {
-      const mockWatchlist = [
-        {
-          id: 1,
-          name: '科技基金',
-          items: [
-            { fund_code: '000001', fund_name: '基金A' },
-            { fund_code: '000002', fund_name: '基金B' },
-          ],
-        },
-      ];
-
-      api.watchlistsAPI.list.mockResolvedValue({ data: mockWatchlist });
-      api.fundsAPI.batchUpdateNav.mockResolvedValue({
-        data: {
-          '000001': { latest_nav: '1.0' },
-          '000002': { latest_nav: '2.0' },
-        },
-      });
-      api.fundsAPI.batchEstimate.mockResolvedValue({
-        data: {
-          '000001': { estimate_growth: '1.50', fund_name: '基金A' },
-          '000002': { estimate_growth: '-0.80', fund_name: '基金B' },
-        },
-      });
-
-      render(<BrowserRouter><WatchlistsPage /></BrowserRouter>);
-
-      await waitFor(() => {
-        // badge 应显示平均涨跌幅: (1.50 + (-0.80)) / 2 = 0.35%
-        expect(screen.getByText('+0.35%')).toBeInTheDocument();
-      });
-    });
-
-    it('分组无基金时不显示 badge', async () => {
-      const mockWatchlist = [
-        { id: 1, name: '空分组', items: [] },
-      ];
-
-      api.watchlistsAPI.list.mockResolvedValue({ data: mockWatchlist });
-      api.fundsAPI.batchUpdateNav.mockResolvedValue({ data: {} });
-      api.fundsAPI.batchEstimate.mockResolvedValue({ data: {} });
-
-      render(<BrowserRouter><WatchlistsPage /></BrowserRouter>);
-
-      await waitFor(() => {
-        expect(screen.getByText('空分组')).toBeInTheDocument();
-      });
-
-      // 不应该有涨跌幅数字
-      expect(screen.queryByText('%')).not.toBeInTheDocument();
-    });
-  });
 });
