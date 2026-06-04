@@ -62,6 +62,7 @@ function AppInner() {
                 }
               />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/admin" element={<Navigate to="/dashboard/admin" />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/initialize" element={<InitializePage />} />
               <Route

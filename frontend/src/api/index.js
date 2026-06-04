@@ -164,6 +164,6 @@ export const adminAPI = {
   toggleUser: (userId) => api.post(`/admin/users/${userId}/toggle/`),
   resetPassword: (userId) => api.post(`/admin/users/${userId}/reset-password/`),
   getStats: () => api.get('/admin/stats/'),
-  triggerTask: (taskName) => api.post(`/admin/tasks/${taskName}/`),
+  triggerTask: (taskName) => api.post(`/admin/tasks/${taskName}/`, {}, { timeout: 120000 }),
 };
 

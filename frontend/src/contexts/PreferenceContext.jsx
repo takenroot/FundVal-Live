@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { preferencesAPI } from '../api';
+import { getToken } from '../utils/auth';
 
 const PreferenceContext = createContext();
 
@@ -9,7 +10,11 @@ export const PreferenceProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadPreference();
+    if (getToken().accessToken) {
+      loadPreference();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const loadPreference = async () => {
@@ -17,8 +22,7 @@ export const PreferenceProvider = ({ children }) => {
       const res = await preferencesAPI.get();
       setPreferredSource(res.data.preferred_source || 'eastmoney');
       setThemeMode(res.data.theme_mode || 'light');
-    } catch (error) {
-      console.error('加载偏好失败', error);
+    } catch {
       setPreferredSource('eastmoney');
       setThemeMode('light');
     } finally {

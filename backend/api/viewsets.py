@@ -1973,8 +1973,15 @@ class AdminViewSet(viewsets.ViewSet):
 
         if task_name == 'recalculate_positions':
             from .services import recalculate_all_positions
-            recalculate_all_positions()
-            return Response({'status': 'completed', 'task_name': task_name})
+            try:
+                recalculate_all_positions()
+                return Response({'status': 'completed', 'task_name': task_name})
+            except Exception as e:
+                logger.error(f'重算全部持仓失败: {e}')
+                return Response(
+                    {'error': f'重算失败: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
         try:
             from fundval.celery import app as celery_app
