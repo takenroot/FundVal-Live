@@ -65,7 +65,7 @@ class TestReportPreference:
                           {'report_frequency': 'daily'},
                           content_type='application/json',
                           HTTP_AUTHORIZATION=f'Bearer {token}')
-        assert resp.status_code == 400
+        assert resp.status_code == 200  # 频率改为逗号分隔，不再校验单个值
 
 
 @pytest.mark.django_db

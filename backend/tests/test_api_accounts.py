@@ -347,7 +347,7 @@ class TestAccountDeleteAPI:
         assert response.data['is_default'] is False
         assert response.data['children_count'] == 2
         assert response.data['positions_count'] == 2
-        assert response.data['total_cost'] == '3000.00'
+        assert float(response.data['total_cost']) == 3000
 
     def test_get_default_account_delete_info(self, client, user):
         """测试获取默认账户删除信息"""

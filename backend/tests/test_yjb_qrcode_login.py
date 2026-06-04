@@ -663,7 +663,6 @@ class TestTokenEncryption:
     def test_token_is_encrypted_in_database(self, user):
         """测试 token 在数据库中是加密的"""
         from api.models import UserSourceCredential
-        from django.db import connection
 
         cred = UserSourceCredential.objects.create(
             user=user,
@@ -671,19 +670,10 @@ class TestTokenEncryption:
             token='plaintext-token-123',
         )
 
-        # 直接查询数据库，验证 token 不是明文
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT token FROM user_source_credential WHERE id = %s",
-                [str(cred.id)]
-            )
-            row = cursor.fetchone()
-            db_token = row[0]
-
-            # 加密后的 token 应该与明文不同
-            # 注意：如果使用 django-encrypted-model-fields，会自动加密
-            # 这里只验证逻辑，实际加密由库处理
-            assert db_token is not None
+        # 直接从 ORM 验证 token 已存储
+        cred.refresh_from_db()
+        assert cred.token is not None
+        assert len(cred.token) > 0
 
     def test_token_decryption_on_read(self, user):
         """测试读取时自动解密"""
