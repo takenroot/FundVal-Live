@@ -147,6 +147,100 @@ class FundViewSet(viewsets.ReadOnlyModelViewSet):
             logger.error(f'获取成分股失败：{fund_code}, 错误：{e}')
             return Response({'fund_code': fund_code, 'holdings': []})
 
+    @action(detail=False, methods=['get'], url_path='compare')
+    def compare(self, request):
+        """GET /api/funds/compare/?codes=000001,161725 — 多基金对比"""
+        from datetime import date, timedelta
+        from decimal import Decimal
+        from django.db.models import Min, Max
+
+        codes_str = request.query_params.get('codes', '')
+        codes = [c.strip() for c in codes_str.split(',') if c.strip()]
+
+        if len(codes) < 2:
+            return Response({'error': '至少选择 2 只基金'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(codes) > 5:
+            return Response({'error': '最多对比 5 只基金'}, status=status.HTTP_400_BAD_REQUEST)
+
+        funds = Fund.objects.filter(fund_code__in=codes)
+        fund_map = {f.fund_code: f for f in funds}
+
+        today = date.today()
+        periods = {'1m': 30, '3m': 90, '6m': 180, '1y': 365}
+
+        def calc_returns(nav_list):
+            result = {}
+            for period_name, days in periods.items():
+                cutoff = today - timedelta(days=days)
+                start_nav = None
+                for n in nav_list:
+                    if n.nav_date <= cutoff:
+                        start_nav = n
+                end_nav = nav_list[-1] if nav_list else None
+                if start_nav and end_nav and start_nav.unit_nav > 0:
+                    result[period_name] = str(round((end_nav.unit_nav - start_nav.unit_nav) / start_nav.unit_nav * 100, 2))
+                else:
+                    result[period_name] = None
+            return result
+
+        def calc_metrics(nav_list):
+            if len(nav_list) < 60:
+                return {'max_drawdown': None, 'volatility': None, 'sharpe': None}
+
+            vals = [float(n.unit_nav) for n in nav_list]
+            # 最大回撤
+            peak = vals[0]
+            max_dd = 0.0
+            for v in vals:
+                if v > peak:
+                    peak = v
+                dd = (peak - v) / peak if peak > 0 else 0
+                if dd > max_dd:
+                    max_dd = dd
+
+            # 波动率（年化标准差，按 252 个交易日）
+            daily_returns = [(vals[i] - vals[i-1]) / vals[i-1] for i in range(1, len(vals))]
+            if len(daily_returns) < 2:
+                return {'max_drawdown': str(round(-max_dd * 100, 2)), 'volatility': None, 'sharpe': None}
+
+            mean = sum(daily_returns) / len(daily_returns)
+            variance = sum((r - mean) ** 2 for r in daily_returns) / (len(daily_returns) - 1)
+            annual_vol = (variance ** 0.5) * (252 ** 0.5)
+
+            # 夏普比率 (无风险利率 2%)
+            avg_daily = mean
+            annual_return = avg_daily * 252
+            sharpe = (annual_return - 0.02) / annual_vol if annual_vol > 0 else None
+
+            return {
+                'max_drawdown': str(round(-max_dd * 100, 2)),
+                'volatility': str(round(annual_vol * 100, 2)),
+                'sharpe': str(round(sharpe, 2)) if sharpe is not None else None,
+            }
+
+        result = []
+        for code in codes:
+            fund = fund_map.get(code)
+            if not fund:
+                continue
+            nav_list = list(FundNavHistory.objects.filter(
+                fund=fund, nav_date__lte=today
+            ).order_by('nav_date'))
+
+            returns = calc_returns(nav_list) if nav_list else {k: None for k in periods}
+            metrics = calc_metrics(nav_list) if nav_list else {'max_drawdown': None, 'volatility': None, 'sharpe': None}
+
+            result.append({
+                'fund_code': fund.fund_code,
+                'fund_name': fund.fund_name,
+                'fund_type': fund.fund_type or '未知',
+                'latest_nav': str(fund.latest_nav) if fund.latest_nav else None,
+                'returns': returns,
+                'metrics': metrics,
+            })
+
+        return Response({'funds': result})
+
     @action(detail=True, methods=['get'], url_path='estimate-intraday')
     def estimate_intraday(self, request, fund_code=None):
         """获取当日盘中估值快照曲线"""

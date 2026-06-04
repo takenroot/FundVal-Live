@@ -11,6 +11,7 @@ import {
   LogoutOutlined,
   SettingOutlined,
   GithubOutlined,
+  RadarChartOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { usePreference } from '../contexts/PreferenceContext';
@@ -45,6 +46,11 @@ const MainLayout = ({ children }) => {
       key: '/dashboard/accounts',
       icon: <AccountBookOutlined />,
       label: isMobile ? '账户' : '账户管理',
+    },
+    {
+      key: '/dashboard/compare',
+      icon: <RadarChartOutlined />,
+      label: isMobile ? '对比' : '基金对比',
     },
     {
       key: '/dashboard/funds',

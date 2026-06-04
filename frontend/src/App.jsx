@@ -14,6 +14,7 @@ import PositionsPage from './pages/PositionsPage';
 import WatchlistsPage from './pages/WatchlistsPage';
 import SettingsPage from './pages/SettingsPage';
 import AdminPage from './pages/AdminPage';
+import ComparePage from './pages/ComparePage';
 import { isAuthenticated, getUser } from './utils/auth';
 import { AuthProvider } from './contexts/AuthContext';
 import { AccountProvider } from './contexts/AccountContext';
@@ -131,6 +132,16 @@ function AppInner() {
                   <PrivateRoute>
                     <MainLayout>
                       <SettingsPage />
+                    </MainLayout>
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/dashboard/compare"
+                element={
+                  <PrivateRoute>
+                    <MainLayout>
+                      <ComparePage />
                     </MainLayout>
                   </PrivateRoute>
                 }
