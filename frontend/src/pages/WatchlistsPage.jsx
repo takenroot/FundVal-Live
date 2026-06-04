@@ -183,6 +183,7 @@ const WatchlistsPage = () => {
   const [searchKeyword, setSearchKeyword] = useState('');
   const [fundOptions, setFundOptions] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [groupGrowths, setGroupGrowths] = useState({});
 
   // 列宽状态
   const [columnWidths, setColumnWidths] = useState({
@@ -291,6 +292,18 @@ const WatchlistsPage = () => {
       });
 
       setFundsData(fundsWithEstimate);
+
+      // 计算当前分组的综合涨跌幅
+      const growths = fundsWithEstimate
+        .map(f => parseFloat(f.estimate_growth))
+        .filter(v => !isNaN(v));
+      if (growths.length > 0) {
+        const avg = growths.reduce((a, b) => a + b, 0) / growths.length;
+        setGroupGrowths(prev => ({
+          ...prev,
+          [selectedWatchlistId]: parseFloat(avg.toFixed(2)),
+        }));
+      }
     } catch (error) {
       message.error('加载基金数据失败');
       setFundsData(currentWatchlist.items);
@@ -561,11 +574,22 @@ const WatchlistsPage = () => {
       <Tabs
         activeKey={selectedWatchlistId}
         onChange={setSelectedWatchlistId}
-        items={watchlists.map(w => ({
+        items={watchlists.map(w => {
+          const growth = groupGrowths[w.id];
+          return {
           key: w.id,
           label: (
             <span>
               {w.name}
+              {growth !== undefined && (
+                <span style={{
+                  marginLeft: 4,
+                  fontSize: 12,
+                  color: growth >= 0 ? '#ff4d4f' : '#52c41a',
+                }}>
+                  {growth >= 0 ? '+' : ''}{growth.toFixed(2)}%
+                </span>
+              )}
               <Popconfirm
                 title="确定删除？"
                 description="删除后无法恢复"
@@ -605,7 +629,8 @@ const WatchlistsPage = () => {
               handleRemoveFund={handleRemoveFund}
             />
           ),
-        }))}
+        };
+      })}
       />
 
       <Modal
