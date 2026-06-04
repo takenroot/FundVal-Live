@@ -16,6 +16,27 @@
 
 ---
 
+## [v2.3.0] - 2026-06-04
+
+### Added
+
+- **管理员用户管理**：新增管理员页面（`/dashboard/admin`），支持用户列表、搜索、禁用/启用、重置密码
+  - 后端：`AdminViewSet` — `GET /api/admin/users/`、`POST /api/admin/users/{id}/toggle/`、`POST /api/admin/users/{id}/reset-password/`
+  - 前端：`AdminPage.jsx` — Ant Design Table + 搜索 + 操作按钮
+  - 侧边栏「用户管理」入口仅管理员可见
+- **管理员仪表盘 + 任务触发**：管理员页面顶部显示系统统计卡片（用户数、基金数、持仓数、最新估值时间），支持手动触发 Celery 任务（同步净值、重算持仓）
+  - 后端：`/api/admin/stats/`、`/api/admin/tasks/{task_name}/`
+- **自选分组综合涨跌幅**：每个自选分组 Tab 标签旁显示该组所有基金的平均估算涨跌幅 badge（红涨绿跌），纯前端计算，零额外请求
+
+### Fixed
+
+- **全部账户汇总默认可见**：进入账户管理页面默认显示全部账户汇总视图
+- **删除自选列表后 UI 自动刷新**：删除当前选中的自选列表后，自动选中剩余的第一个列表
+- **删除账户后列表刷新**：删除当前选中的父账户后，自动重置选中并刷新列表
+- **Gunicorn 超时配置**：新增 `--timeout 90` 参数，防止 AI 分析等长时间请求被 Gunicorn 提前 kill
+
+---
+
 ## [v2.2.1] - 2026-06-04
 
 ### Fixed
