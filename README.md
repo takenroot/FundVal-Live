@@ -135,6 +135,29 @@ docker-compose up -d
 docker-compose logs -f backend  # 查看后端日志和 Bootstrap Key
 ```
 
+#### 5. 更新到最新版本
+
+新版本发布后，拉取最新 Docker 镜像并重启服务即可，数据不会丢失：
+
+```bash
+# 拉取最新镜像
+docker compose pull backend frontend
+
+# 重启服务（仅重启有更新的容器）
+docker compose up -d --no-deps backend frontend
+
+# 如有数据库迁移，手动执行
+docker compose exec backend python manage.py migrate --noinput
+
+# 查看版本
+curl http://localhost:21345/api/health/
+```
+
+**注意**：
+- `postgres_data` 和 `config_data` 两个 volume 是持久化的，更新不会影响数据
+- `.env` 文件不会被覆盖，自定义配置保留
+- 如果 `.env` 有新增的配置项，需要对照 `.env.example` 手动添加
+
 ### 手动部署
 
 #### 必需组件
