@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Card, Table, Button, Input, Tag, message, Modal, Space, Typography } from 'antd';
-import { SearchOutlined, ReloadOutlined, LockOutlined, StopOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Table, Button, Input, Tag, message, Modal, Space, Typography, Row, Col, Statistic } from 'antd';
+import { SearchOutlined, ReloadOutlined, LockOutlined, StopOutlined, CheckCircleOutlined, SyncOutlined, BarChartOutlined } from '@ant-design/icons';
 import { adminAPI } from '../api';
 
 const { Text } = Typography;
@@ -12,6 +12,8 @@ const AdminPage = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [passwordModal, setPasswordModal] = useState({ open: false, password: '', username: '' });
+  const [stats, setStats] = useState(null);
+  const [taskLoading, setTaskLoading] = useState({});
 
   const loadUsers = async (pageNum = 1, searchTerm = '') => {
     setLoading(true);
@@ -28,7 +30,26 @@ const AdminPage = () => {
     }
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadUsers(); loadStats(); }, []);
+
+  const loadStats = async () => {
+    try {
+      const { data } = await adminAPI.getStats();
+      setStats(data);
+    } catch { /* stats 加载失败不影响用户列表 */ }
+  };
+
+  const handleTriggerTask = async (taskName, label) => {
+    setTaskLoading(prev => ({ ...prev, [taskName]: true }));
+    try {
+      await adminAPI.triggerTask(taskName);
+      message.success(`${label}已触发`);
+    } catch (err) {
+      message.error(`${label}触发失败: ${err.response?.data?.error || '未知错误'}`);
+    } finally {
+      setTaskLoading(prev => ({ ...prev, [taskName]: false }));
+    }
+  };
 
   const handleToggle = async (user) => {
     const action = user.is_active ? '禁用' : '启用';
@@ -100,6 +121,58 @@ const AdminPage = () => {
 
   return (
     <>
+      {stats && (
+        <Card size="small" style={{ marginBottom: 16 }}>
+          <Row gutter={16}>
+            <Col xs={12} sm={6}>
+              <Statistic title="用户总数" value={stats.user_count} prefix={<BarChartOutlined />} />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic title="基金总数" value={stats.fund_count} />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic title="持仓总数" value={stats.position_count} />
+            </Col>
+            <Col xs={12} sm={6}>
+              <Statistic
+                title="最新估值"
+                value={stats.latest_estimate_time
+                  ? new Date(stats.latest_estimate_time).toLocaleTimeString('zh-CN')
+                  : '无数据'}
+              />
+            </Col>
+          </Row>
+          <Row gutter={16} style={{ marginTop: 12 }}>
+            <Col>
+              <Button
+                icon={<SyncOutlined />}
+                loading={taskLoading.update_fund_nav}
+                onClick={() => handleTriggerTask('update_fund_nav', '同步全部净值')}
+              >
+                同步全部净值
+              </Button>
+            </Col>
+            <Col>
+              <Button
+                icon={<SyncOutlined />}
+                loading={taskLoading.update_fund_today_nav}
+                onClick={() => handleTriggerTask('update_fund_today_nav', '同步当日净值')}
+              >
+                同步当日净值
+              </Button>
+            </Col>
+            <Col>
+              <Button
+                loading={taskLoading.recalculate_positions}
+                onClick={() => handleTriggerTask('recalculate_positions', '重算全部持仓')}
+              >
+                重算全部持仓
+              </Button>
+            </Col>
+          </Row>
+        </Card>
+      )}
+
       <Card
         title="用户管理"
         extra={

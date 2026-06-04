@@ -1904,3 +1904,66 @@ class AdminViewSet(viewsets.ViewSet):
             'username': user.username,
             'new_password': new_password,
         })
+
+    @action(detail=False, methods=['get'], url_path='stats')
+    def stats(self, request):
+        """GET /api/admin/stats/ — 系统统计"""
+        from django.contrib.auth import get_user_model
+        from datetime import datetime
+
+        User = get_user_model()
+        now = datetime.now()
+
+        try:
+            latest_estimate = Fund.objects.exclude(
+                estimate_time__isnull=True
+            ).latest('estimate_time')
+            latest_estimate_time = latest_estimate.estimate_time.isoformat()
+        except Fund.DoesNotExist:
+            latest_estimate_time = None
+
+        return Response({
+            'user_count': User.objects.count(),
+            'fund_count': Fund.objects.count(),
+            'position_count': Position.objects.count(),
+            'nav_history_count': FundNavHistory.objects.count(),
+            'latest_estimate_time': latest_estimate_time,
+            'version': '2.2.1',
+        })
+
+    @action(detail=False, methods=['post'], url_path=r'tasks/(?P<task_name>[^/.]+)')
+    def trigger_task(self, request, task_name=None):
+        """POST /api/admin/tasks/{task_name}/ — 手动触发 Celery 任务"""
+        TASK_WHITELIST = {
+            'update_fund_nav': 'api.tasks.update_fund_nav',
+            'update_fund_today_nav': 'api.tasks.update_fund_today_nav',
+            'recalculate_positions': None,  # 同步执行
+        }
+
+        if task_name not in TASK_WHITELIST:
+            return Response(
+                {'error': f'未知任务: {task_name}，可选: {", ".join(TASK_WHITELIST.keys())}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if task_name == 'recalculate_positions':
+            from .services import recalculate_all_positions
+            recalculate_all_positions()
+            return Response({'status': 'completed', 'task_name': task_name})
+
+        try:
+            from fundval.celery import app as celery_app
+            task_path = TASK_WHITELIST[task_name]
+            result = celery_app.send_task(task_path)
+            return Response({
+                'status': 'triggered',
+                'task_name': task_name,
+                'task_id': str(result.id),
+            })
+        except Exception as e:
+            logger.warning(f'Celery 任务触发失败: {task_name}, 错误: {e}')
+            return Response({
+                'status': 'error',
+                'task_name': task_name,
+                'error': 'Celery 服务不可用，任务未能触发',
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)

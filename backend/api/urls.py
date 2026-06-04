@@ -63,6 +63,8 @@ urlpatterns = [
     path('admin/users/', viewsets.AdminViewSet.as_view({'get': 'list'})),
     path('admin/users/<int:user_id>/toggle/', viewsets.AdminViewSet.as_view({'post': 'toggle_active'})),
     path('admin/users/<int:user_id>/reset-password/', viewsets.AdminViewSet.as_view({'post': 'reset_password'})),
+    path('admin/stats/', viewsets.AdminViewSet.as_view({'get': 'stats'})),
+    path('admin/tasks/<str:task_name>/', viewsets.AdminViewSet.as_view({'post': 'trigger_task'})),
 
     # API 路由
     path('', include(router.urls)),

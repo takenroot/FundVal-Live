@@ -159,5 +159,7 @@ export const adminAPI = {
   listUsers: (params) => api.get('/admin/users/', { params }),
   toggleUser: (userId) => api.post(`/admin/users/${userId}/toggle/`),
   resetPassword: (userId) => api.post(`/admin/users/${userId}/reset-password/`),
+  getStats: () => api.get('/admin/stats/'),
+  triggerTask: (taskName) => api.post(`/admin/tasks/${taskName}/`),
 };
 
