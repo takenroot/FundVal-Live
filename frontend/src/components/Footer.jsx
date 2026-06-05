@@ -1,11 +1,21 @@
+import { useState, useEffect } from 'react';
 import { Layout, Space, Typography, theme } from 'antd';
 import { GithubOutlined } from '@ant-design/icons';
+import { healthCheck } from '../api';
 
 const { Footer: AntFooter } = Layout;
 const { Link, Text } = Typography;
 
 const Footer = () => {
   const { token } = theme.useToken();
+  const [version, setVersion] = useState('');
+
+  useEffect(() => {
+    healthCheck()
+      .then((res) => setVersion(res.data.version || ''))
+      .catch(() => {});
+  }, []);
+
   return (
     <AntFooter
       style={{
@@ -45,6 +55,11 @@ const Footer = () => {
           >
             <span>⭐ Star</span>
           </Link>
+          {version && (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              v{version}
+            </Text>
+          )}
         </Space>
       </Space>
     </AntFooter>

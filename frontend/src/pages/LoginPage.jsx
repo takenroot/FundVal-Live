@@ -213,7 +213,7 @@ function LoginPage() {
 
       <Footer style={{ textAlign: 'center', background: 'transparent' }}>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          &copy; 2026 Fundval. All rights reserved.
+          &copy; 2026 Fundval v2.5.1
         </Text>
       </Footer>
 

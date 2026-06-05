@@ -41,6 +41,7 @@ import {
   LockOutlined,
 } from '@ant-design/icons';
 import { isNativeApp } from '../App';
+import VersionCard from '../components/VersionCard';
 import {
   sourceAPI,
   aiAPI,
@@ -1560,6 +1561,7 @@ const SettingsPage = () => {
 
   return (
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <VersionCard />
       <Card title="个人信息">
         <div style={{ marginBottom: 16 }}>
           <span style={{ color: '#999' }}>用户名：</span>
