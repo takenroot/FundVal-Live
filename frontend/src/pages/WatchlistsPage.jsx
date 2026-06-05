@@ -316,9 +316,10 @@ const WatchlistsPage = () => {
         fundsAPI.batchEstimate(fundCodes),
       ]);
 
-      // 增量更新 - 只更新变化字段，不替换整个数组避免闪屏
-      setFundsData((prev) =>
-        prev.map((item) => {
+      // 首次加载用 items 初始化，后续增量更新避免闪屏
+      setFundsData((prev) => {
+        const source = prev.length > 0 ? prev : currentWatchlist.items;
+        return source.map((item) => {
           const nav = navsResponse.data[item.fund_code] || {};
           const estimate = estimatesResponse.data[item.fund_code] || {};
           return {
@@ -330,12 +331,13 @@ const WatchlistsPage = () => {
             estimate_growth: estimate.estimate_growth || item.estimate_growth,
             fund_name: estimate.fund_name || item.fund_name,
           };
-        })
-      );
+        });
+      });
 
       // 计算当前分组的综合涨跌幅
-      const growths = fundsWithEstimate
-        .map((f) => parseFloat(f.estimate_growth))
+      const estimates = estimatesResponse.data || {};
+      const growths = currentWatchlist.items
+        .map((item) => parseFloat(estimates[item.fund_code]?.estimate_growth))
         .filter((v) => !isNaN(v));
       if (growths.length > 0) {
         const avg = growths.reduce((a, b) => a + b, 0) / growths.length;

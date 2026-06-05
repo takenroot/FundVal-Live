@@ -217,8 +217,8 @@ def capture_intraday_snapshots():
         logger.info(f"{today} 不是交易日，跳过估值快照抓取")
         return "非交易日"
 
-    now = timezone.now()
-    # 只在交易时段执行
+    now = timezone.localtime()
+    # 只在交易时段执行（北京时间）
     market_open = now.replace(hour=9, minute=30, second=0)
     market_close = now.replace(hour=15, minute=5, second=0)
     if now < market_open or now > market_close:

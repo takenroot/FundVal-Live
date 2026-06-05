@@ -137,19 +137,20 @@ docker-compose logs -f backend  # 查看后端日志和 Bootstrap Key
 
 #### 5. 更新到最新版本
 
-新版本发布后，拉取最新 Docker 镜像并重启服务即可，数据不会丢失：
+新版本发布后，按以下步骤更新，数据不会丢失：
 
 ```bash
-# 拉取最新镜像
-docker compose pull backend frontend
+# 1. 拉取所有最新镜像
+docker compose pull
 
-# 重启服务（仅重启有更新的容器）
-docker compose up -d --no-deps backend frontend
-
-# 如有数据库迁移，手动执行
+# 2. 如有新数据库迁移，先执行（重要）
 docker compose exec backend python manage.py migrate --noinput
 
-# 查看版本
+# 3. 重启所有服务
+docker compose up -d --no-deps backend frontend celery-beat celery-worker
+
+# 4. 等待服务启动后验证
+sleep 5
 curl http://localhost:21345/api/health/
 ```
 
@@ -157,6 +158,18 @@ curl http://localhost:21345/api/health/
 - `postgres_data` 和 `config_data` 两个 volume 是持久化的，更新不会影响数据
 - `.env` 文件不会被覆盖，自定义配置保留
 - 如果 `.env` 有新增的配置项，需要对照 `.env.example` 手动添加
+- 更新后如页面仍显示旧版，请**强制刷新浏览器**（Ctrl+Shift+R / Cmd+Shift+R）清除 JS 缓存
+- 如遇 `加载基金数据失败` 等错误，通常是未执行迁移导致，执行第 2 步即可
+
+#### 6. 常见问题
+
+| 问题 | 原因 | 解决 |
+|------|------|------|
+| 页面报错 `加载基金数据失败` | 更新后未执行数据库迁移 | `docker compose exec backend python manage.py migrate --noinput` |
+| 更新后页面仍是旧版 | 浏览器缓存了旧 JS 文件 | 强制刷新（Ctrl+Shift+R）或开无痕窗口 |
+| Celery 任务不执行 | celery-beat 容器未更新 | `docker compose up -d --no-deps celery-beat` |
+
+更多问题参考 [问题排查手册](docs/问题排查.md)。
 
 ### 手动部署
 
