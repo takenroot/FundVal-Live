@@ -119,6 +119,9 @@ redis-cli
 redis-server
 redis.tar.gz
 
+# Local backup dir (06-06: bug-fix patch backups, git history is the real backup)
+_backups/
+
 # Upstream Mixed
 image.png
 yjb

@@ -30,7 +30,15 @@ services:
       - fundval
 
   backend:
-    image: ${BACKEND_IMAGE:-jasamine/fundval-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: fundval-backend:local
+    # ⚠ IP 写死 — podman 3.4.4 + dnsname 插件在全新启动时不可靠 (backend /etc/hosts 没自动注入 db/redis)
+    # IP 稳定在 10.88.0.2-7, 容器不重启就不漂移
+    extra_hosts:
+      - "db:10.88.0.2"
+      - "redis:10.88.0.3"
     command: gunicorn fundval.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-4} --timeout ${GUNICORN_TIMEOUT:-90} --access-logfile - --error-logfile -
     volumes:
       # 生产环境：只挂载配置目录，不挂载代码
@@ -64,7 +72,14 @@ services:
       - fundval
 
   celery-worker:
-    image: ${BACKEND_IMAGE:-jasamine/fundval-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: fundval-backend:local
+    # extra_hosts 保留 — 同 backend (db/redis)
+    extra_hosts:
+      - "db:10.88.0.2"
+      - "redis:10.88.0.3"
     entrypoint: []
     command: celery -A fundval worker -l ${CELERY_LOGLEVEL:-info}
     volumes:
@@ -90,7 +105,14 @@ services:
       - fundval
 
   celery-beat:
-    image: ${BACKEND_IMAGE:-jasamine/fundval-backend:latest}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: fundval-backend:local
+    # extra_hosts 保留 — 同 backend (db/redis)
+    extra_hosts:
+      - "db:10.88.0.2"
+      - "redis:10.88.0.3"
     entrypoint: []
     command: celery -A fundval beat -l ${CELERY_LOGLEVEL:-info}
     volumes:
@@ -116,7 +138,13 @@ services:
       - fundval
 
   frontend:
-    image: ${FRONTEND_IMAGE:-jasamine/fundval-frontend:latest}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: fundval-frontend:local
+    # extra_hosts 保留 — podman 自动注入 frontend/backend 解析在全新启动时不可靠
+    extra_hosts:
+      - "backend:10.88.0.4"
     ports:
       - "${FRONTEND_PORT:-21345}:80"
     depends_on:

@@ -4,6 +4,7 @@ Celery 任务
 定义所有后台异步任务
 """
 
+from typing import Optional
 from celery import shared_task
 from django.core.management import call_command
 import logging
@@ -11,6 +12,43 @@ import requests
 from datetime import date
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def sync_nav_history_full(start_date: Optional[str] = None, end_date: Optional[str] = None):
+    """
+    全量同步所有基金的历史净值（首次启动 / 数据补全用）
+
+    默认拉 2024-01-01 至今（约 2.5 年历史），够算 1y/6m/3m/1m returns
+    与 max_drawdown / volatility / sharpe 三个 metrics。
+
+    Args:
+        start_date: ISO 字符串 (YYYY-MM-DD)
+        end_date:   ISO 字符串 (YYYY-MM-DD)
+    """
+    from datetime import datetime
+    from api.services.nav_history import batch_sync_nav_history
+    from api.models import Fund
+
+    if not start_date:
+        start_date = "2024-01-01"
+    if not end_date:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+
+    sd = datetime.strptime(start_date, "%Y-%m-%d").date()
+    ed = datetime.strptime(end_date, "%Y-%m-%d").date()
+
+    try:
+        fund_codes = list(Fund.objects.values_list("fund_code", flat=True))
+        logger.info(f"开始全量同步 {len(fund_codes)} 只基金历史净值 ({sd} ~ {ed})")
+        results = batch_sync_nav_history(fund_codes, sd, ed)
+        success = sum(1 for r in results.values() if r["success"])
+        total = sum(r.get("count", 0) for r in results.values() if r["success"])
+        logger.info(f"历史净值同步完成：成功 {success}/{len(fund_codes)} 只，新增 {total} 条")
+        return f"成功 {success} 只，新增 {total} 条"
+    except Exception as e:
+        logger.error(f"全量历史净值同步失败: {str(e)}")
+        raise
 
 
 @shared_task
