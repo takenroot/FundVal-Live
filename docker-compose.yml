@@ -7,16 +7,18 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fundval}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # 如需从宿主机访问数据库，取消注释并在 .env 设置 POSTGRES_PORT
-    # ports:
-    #   - "${POSTGRES_PORT:-5432}:5432"
+    # 暴露 5432 到 WSL 主机 (Windows 客户端通过 localhost:5432 连)
+    # 镜像模式下 Windows localhost 直达 WSL localhost, 不需要 netsh portproxy
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fundval}"]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
-      - fundval
+      fundval:
+        ipv4_address: 10.88.0.2   # 固定 IP (治本 — podman 3.4.4 dnsname 不可靠, ipv4_address 是唯一稳定方案)
 
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
@@ -27,15 +29,17 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - fundval
+      fundval:
+        ipv4_address: 10.88.0.3
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     image: fundval-backend:local
-    # ⚠ IP 写死 — podman 3.4.4 + dnsname 插件在全新启动时不可靠 (backend /etc/hosts 没自动注入 db/redis)
-    # IP 稳定在 10.88.0.2-7, 容器不重启就不漂移
+    # 2026-06-07 治本组合: ipv4_address 固定 IP + extra_hosts 写入对应解析
+    # (podman 3.4.4 dnsname 插件不工作, 必须 extra_hosts 兜底)
+    # IP 永远是 db=0.2, redis=0.3 — 任何重启不漂
     extra_hosts:
       - "db:10.88.0.2"
       - "redis:10.88.0.3"
@@ -53,7 +57,7 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-only}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-only-change-in-production}
       - DEBUG=${DEBUG:-false}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
       - ALLOW_REGISTER=${ALLOW_REGISTER:-false}
@@ -69,14 +73,15 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - fundval
+      fundval:
+        ipv4_address: 10.88.0.4
 
   celery-worker:
     build:
       context: ./backend
       dockerfile: Dockerfile
     image: fundval-backend:local
-    # extra_hosts 保留 — 同 backend (db/redis)
+    # 2026-06-07 治本组合
     extra_hosts:
       - "db:10.88.0.2"
       - "redis:10.88.0.3"
@@ -94,7 +99,7 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-only}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-only-change-in-production}
       - DEBUG=${DEBUG:-false}
     depends_on:
       db:
@@ -102,14 +107,15 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - fundval
+      fundval:
+        ipv4_address: 10.88.0.5
 
   celery-beat:
     build:
       context: ./backend
       dockerfile: Dockerfile
     image: fundval-backend:local
-    # extra_hosts 保留 — 同 backend (db/redis)
+    # 2026-06-07 治本组合
     extra_hosts:
       - "db:10.88.0.2"
       - "redis:10.88.0.3"
@@ -127,7 +133,7 @@ services:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-only}
+      - SECRET_KEY=${SECRET_KEY:-django-insecure-dev-only-change-in-production}
       - DEBUG=${DEBUG:-false}
     depends_on:
       db:
@@ -135,23 +141,23 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - fundval
+      fundval:
+        ipv4_address: 10.88.0.6
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     image: fundval-frontend:local
-    # extra_hosts 保留 — podman 自动注入 frontend/backend 解析在全新启动时不可靠
-    extra_hosts:
-      - "backend:10.88.0.4"
+    # 2026-06-07 治本: 删 extra_hosts, 用 entrypoint 扫描 subnet 找 backend
     ports:
       - "${FRONTEND_PORT:-21345}:80"
     depends_on:
       backend:
         condition: service_healthy
     networks:
-      - fundval
+      fundval:
+        ipv4_address: 10.88.0.7
 
 volumes:
   postgres_data:
@@ -160,3 +166,9 @@ volumes:
 networks:
   fundval:
     driver: bridge
+    # 2026-06-07 治本: 用 ipam 固定子网, 配合 ipv4_address
+    # podman 3.4.4 限制: 不支持 driver: default (你贴的内容提到)
+    # 省略 driver 字段让 podman 用默认 (host-local)
+    ipam:
+      config:
+        - subnet: 10.88.0.0/24

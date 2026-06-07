@@ -23,6 +23,10 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # 复制 nginx 配置
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# 2026-06-07 治本: 用 entrypoint.sh 启动时解析 backend 容器名
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+ENTRYPOINT ["/entrypoint.sh"]
