@@ -310,7 +310,7 @@ def ai_analyze(request):
         "context_data": { ... }
     }
     """
-    from .models import AIConfig, AIPromptTemplate
+    from .models import AIConfig, AIPromptTemplate, Fund, FundNavHistory
 
     template_id = request.data.get("template_id")
     context_data = request.data.get("context_data", {})
@@ -319,6 +319,40 @@ def ai_analyze(request):
         return Response(
             {"error": "缺少 template_id"}, status=status.HTTP_400_BAD_REQUEST
         )
+
+    # 2026-06-07 修: 自动从 DB 填 context_data (兼容 {fund_code: "X"} 直传, 不用 context_data 包装)
+    if not context_data:
+        fund_code = request.data.get("fund_code")
+        if fund_code:
+            try:
+                fund = Fund.objects.get(fund_code=fund_code)
+            except Fund.DoesNotExist:
+                return Response(
+                    {"error": f"基金代码 {fund_code} 不存在"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            history_qs = FundNavHistory.objects.filter(fund=fund).order_by(
+                "-nav_date"
+            )[:30]
+            history_list = list(history_qs)[::-1]  # 反转成时间正序
+            nav_history_str = (
+                "\n".join(
+                    f"{h.nav_date}: {h.unit_nav}" for h in history_list
+                )
+                or "暂无历史净值"
+            )
+            context_data = {
+                "fund_code": fund.fund_code,
+                "fund_name": fund.fund_name or "未知",
+                "fund_type": fund.fund_type or "未知",
+                "latest_nav": str(fund.latest_nav) if fund.latest_nav else "暂无",
+                "estimate_growth": (
+                    f"{fund.estimate_growth:.2f}"
+                    if fund.estimate_growth is not None
+                    else "暂无"
+                ),
+                "nav_history": nav_history_str,
+            }
 
     # 取模板（只能用自己的）
     try:
