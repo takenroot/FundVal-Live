@@ -9,12 +9,16 @@
 
 ## 1. 是什么
 
-**FundVal-Live** (Ye-Yu-Mo/Fundval) — Django 6 + DRF + Celery + React SPA 基金估值与资产管理系统。
+**FundVal-Live** (Ye-Yu-Mo/Fundval) — Django 6 + DRF + Celery + React 19 SPA 基金估值与资产管理系统。
 - **AGPL-3.0** (严格 copyleft)
 - 4/4 全中"基金 bot" 4 条件(开源 + CLI + 虚拟持仓 + 真实数据)
 - 4 大数据源: EastMoney (无登录) / Sina (股票) / 养基宝 (扫码) / 小倍养基 (手机号)
 - 后端 stack: Django 6 / Celery 5 / PostgreSQL 16 / Redis 7
-- 前端 stack: React 18 + Vite + React Router (`frontend/src/App.jsx` 是入口, 不是 .vue)
+- **平台 (3 端共享同一份 React 代码 + API)**:
+  - **Web** (浏览器) — React 19 SPA
+  - **Desktop** (Tauri 2.10) — Rust 后端 + 系统 WebView (macOS .dmg / Windows .msi / Linux .AppImage/.deb)
+  - **Android** (Capacitor 8.1) — Web 代码 + Android System WebView 包装成 APK
+- 前端 stack: React 19 + Vite + Ant Design + ECharts (`frontend/src/App.jsx` 是入口, 不是 .vue)
 
 **版本**: 2.5.2 (后端 + 前端)
 
@@ -250,12 +254,11 @@ print('RESET admin password → new_password')
 
 ## 13. Last Updated
 
-2026-06-07 15:55
-- AI analyze 占位符自动填修 (commit `a553819` 推 fork)
-- 治本 fixup (commit `c3549ea` 推 fork)
-- AGENTS.md 重写 7 处 (前端栈 Vue→React / JWT Bearer / ai 端点 / etc.)
-- 加 §15 今日修
-- 通知系统 verify 完 (webhook/email 2 种, AI 不接通知)
+2026-06-07 16:45
+- AGENTS.md §1 补 3 端架构 (Web / Desktop Tauri / Android Capacitor)
+- AGENTS.md §16 加 3 端 + Android 打包详细指南
+- React 18 → 19 修正 (package.json 是 ^19.2.0)
+- 通知系统 verify (webhook/email 2 种, AI 不接通知, aliyun cron 需手动转发)
 
 ---
 
@@ -422,7 +425,155 @@ MSG=$(echo "$AI_RESP" | python3 -c "import json,sys; print(json.load(sys.stdin).
 curl -X POST "$SLACK_WEBHOOK" -d "{\"text\":\"$MSG\"}"
 
 # 或发 email
-echo "$MSG" | mail -s "AI 基金分析" user@example.com
+echo "$MSG" | mail -s "AI 基金分析 161725" user@example.com
 ```
 
 **AI 不会自动发通知** — 必须 aliyun cron 写 shell 脚本手动提取 + 转发 (见 §9 已知问题 #6)
+
+---
+
+## 16. 3 端架构 + Android 打包指南 (2026-06-07)
+
+### 16.1 3 端全景
+
+```
+┌────────────────────────────────────────────────┐
+│              6 容器 (本地 podman)                │
+│  db / backend / redis / celery×2 / frontend     │
+│  http://localhost:21345                         │
+└────────────────────────────────────────────────┘
+                       ↕ /api/* (JSON)
+       ┌───────────────┼───────────────┐
+       ↓               ↓               ↓
+  ┌─────────┐    ┌──────────┐    ┌──────────┐
+  │   Web   │    │ Desktop  │    │ Android  │
+  │ Browser │    │  Tauri   │    │Capacitor │
+  │ 直接访问 │    │ 2.10     │    │  8.1     │
+  │ React 19│    │ Rust +   │    │ WebView  │
+  │ SPA     │    │ WebView  │    │ 包装     │
+  └─────────┘    └──────────┘    └──────────┘
+  任何浏览器      macOS/Windows/  Android 8+
+                  Linux           (Capacitor 8 要求)
+                  跨 3 OS
+```
+
+### 16.2 Desktop 端 (Tauri)
+
+**技术栈**:
+- **Tauri 2.10** (Rust 核心 + 系统 WebView, 不用 Chromium 内核, 比 Electron 轻 ~10x)
+- 安装包: macOS ~5MB / Windows ~5MB / Linux ~5MB (vs Electron ~150MB)
+- 入口: `frontend/src-tauri/`
+- 配置: `frontend/src-tauri/tauri.conf.json` (productName=Fundval, identifier=com.fundval.app, 窗口 1200x800)
+
+**打包命令** (跨 3 OS):
+```bash
+cd frontend
+npm install
+npm run tauri:build    # 打 .dmg / .msi / .AppImage / .deb (按当前 OS)
+```
+
+**CI/CD** (已在跑): `.github/workflows/release.yml`
+- `git push tag v*` → 自动 build 4 个 desktop 平台 (macOS-ARM64/Intel + Linux + Windows)
+- 产物上传到 GitHub release artifacts
+
+### 16.3 Android 端 (Capacitor) — 重点
+
+**技术栈**:
+- **Capacitor 8.1** (Ionic 出的, Web 代码 + 系统 WebView 包装成 APK, 跟 RN/Flutter 思路类似但更 web 化)
+- **不是原生 Kotlin/Java** — WebView 里跑 React 19 SPA
+- 包: `@capacitor/core` + `@capacitor/android` + `@capacitor/cli` (^8.1.0)
+- 配置: `frontend/capacitor.config.json` (appId=com.fundval.app, appName=Fundval, webDir=dist)
+- 入口: `frontend/` (跟 Web 端共用)
+
+**JDK 21 兼容**: ✅ 装着 (`openjdk 21.0.11`)
+**Android SDK 现状** (2026-06-07): ❌ **没装** (ANDROID_HOME 空), 装要 ~5GB
+
+#### 打包 5 步 (一次性)
+
+```bash
+cd frontend
+
+# 1. 装依赖 (5 min, 装 @capacitor/* + @tauri-apps/* 跟其它 200+ npm 包)
+npm install
+
+# 2. 打 web 静态文件 (Android 包里的 webDir 指这里)
+npm run build
+# → 生成 dist/ (index.html + assets/)
+
+# 3. 第一次才需要: 初始化 android 平台 (生成 android/ 目录)
+npx cap add android
+# → 生成 android/ (Gradle + AndroidManifest + Java 包装)
+
+# 4. 同步: web 静态文件 + capacitor config 拷到 android 项目
+npx cap sync android
+# → dist/ 拷到 android/app/src/main/assets/public/
+
+# 5. 打 APK
+cd android
+./gradlew assembleDebug      # Debug APK (无签名, 不能上 Play Store)
+./gradlew assembleRelease    # Release APK (需先配签名)
+# → 产物: android/app/build/outputs/apk/debug/app-debug.apk
+# → 产物: android/app/build/outputs/apk/release/app-release.apk
+```
+
+#### 装到手机 (3 种方式)
+
+```bash
+# 1. adb install (USB 连电脑, USB 调试打开)
+adb install android/app/build/outputs/apk/debug/app-debug.apk
+
+# 2. 拷到手机, 文件管理器点 .apk 安装 (要开"未知来源")
+
+# 3. 上传到内网分发平台 (公司用) 或 Google Play ($25 开发者账号)
+```
+
+#### App 怎么用 — API endpoint 配置
+
+**核心**: App 启动加载 `capacitor.config.json` 里的 `webDir: "dist"` (本地静态文件), 但 **API 请求得指向 backend**, 3 方案:
+
+| 方案 | API endpoint 配法 | 适用 |
+|---|---|---|
+| **A. 本地 backend** | `http://192.168.x.x:21345` (手机跟电脑同 wifi, 用电脑 IP) | 家庭调试 |
+| **B. aliyun backend** | `http://39.104.69.115:21345` (aliyun 公网 IP, 需先 aliyun 部署) | **生产** |
+| **C. aliyun + HTTPS + 域名** | `https://fundval.yourdomain.com` | 推荐, 防 HTTP 明文 + 防劫持 |
+
+**改 `capacitor.config.json`**:
+```json
+{
+  "appId": "com.fundval.app",
+  "appName": "Fundval",
+  "webDir": "dist",
+  "server": {
+    "url": "http://39.104.69.115:21345"  ← 新加, 指 aliyun backend
+  }
+}
+```
+
+#### 跟 aliyun (小小左) 联动 — 推荐路径
+
+1. **aliyun 部署 backend + db** (见 §10 待办)
+2. **aliyun 暴露 21345 端口** (安全组 + nginx 反代)
+3. **改 `capacitor.config.json` 的 `server.url` → aliyun 公网 IP**
+4. **打 APK**: `npm run build && npx cap sync android && ./gradlew assembleDebug`
+5. **APK 装手机** → 启动 → 直接连 aliyun backend
+
+**备选 — 不打 APK, 用 PWA** (5 min 出):
+- 改 `vite.config.js` 加 `vite-plugin-pwa`
+- 加 `manifest.json` (图标 / 启动画面 / 应用名)
+- aliyun 部署后, **手机浏览器打开 aliyun 公网 IP** → "添加到主屏幕" → 跟 APK 一样的桌面图标 + 全屏体验
+- 缺点: 缺原生能力 (推送 / 后台), 但**90% 体验** + **不用装 Android SDK**
+
+### 16.4 跟 §15 (AI 修复) 联动
+
+aliyun 部署 + APK 装好后, 移动端体验:
+- 自选 / 持仓 / 行情 / AI 分析 全在手机上
+- cron 自动调 AI (aliyun crond) → 通知到 webhook (手机 push 走企业微信)
+- 见 §15 末尾 aliyun cron 调 AI 模板
+
+### 16.5 待办
+
+- [ ] **本地装 Android SDK** (cmdline-tools + platforms + build-tools ~5GB) — 装好后能本地反复打 APK
+- [ ] **改 GitHub Actions 加 build-android job** — 不用本地装, push 触发远程打
+- [ ] **PWA manifest** (5 min 降级方案, 验证 mobile 体验)
+- [ ] **aliyun 公网 IP + 端口暴露** (打 APK 前必须)
+- [ ] **HTTPS + 域名** (生产推荐, 防 HTTP 明文)
