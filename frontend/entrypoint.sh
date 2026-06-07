@@ -24,10 +24,10 @@ fi
 
 # 2. 扫 subnet 试 8000 端口 (fallback, 30 次重试)
 if [ $RESOLVED -eq 0 ]; then
-  echo "  getent failed, scanning subnet 10.88.0.0/24 for :8000..."
+  echo "  getent failed, scanning subnet 10.89.0.0/24 for :8000..."
   for i in 1 2 3 4 5 6 7 8 9 10; do
     for last in 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
-      ip="10.88.0.$last"
+      ip="10.89.0.$last"
       # 试 8000 端口 (busybox nc -z)
       if nc -z -w 1 "$ip" 8000 2>/dev/null; then
         echo "$ip backend" >> /etc/hosts

@@ -18,7 +18,7 @@ services:
       retries: 5
     networks:
       fundval:
-        ipv4_address: 10.88.0.2   # 固定 IP (治本 — podman 3.4.4 dnsname 不可靠, ipv4_address 是唯一稳定方案)
+        ipv4_address: 10.89.0.2   # 固定 IP (治本 — podman 3.4.4 dnsname 不可靠, ipv4_address 是唯一稳定方案)
 
   redis:
     image: ${REDIS_IMAGE:-redis:7-alpine}
@@ -30,7 +30,7 @@ services:
       retries: 5
     networks:
       fundval:
-        ipv4_address: 10.88.0.3
+        ipv4_address: 10.89.0.3
 
   backend:
     build:
@@ -41,8 +41,8 @@ services:
     # (podman 3.4.4 dnsname 插件不工作, 必须 extra_hosts 兜底)
     # IP 永远是 db=0.2, redis=0.3 — 任何重启不漂
     extra_hosts:
-      - "db:10.88.0.2"
-      - "redis:10.88.0.3"
+      - "db:10.89.0.2"
+      - "redis:10.89.0.3"
     command: gunicorn fundval.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-4} --timeout ${GUNICORN_TIMEOUT:-90} --access-logfile - --error-logfile -
     volumes:
       # 生产环境：只挂载配置目录，不挂载代码
@@ -74,7 +74,7 @@ services:
       start_period: 30s
     networks:
       fundval:
-        ipv4_address: 10.88.0.4
+        ipv4_address: 10.89.0.4
 
   celery-worker:
     build:
@@ -83,8 +83,8 @@ services:
     image: fundval-backend:local
     # 2026-06-07 治本组合
     extra_hosts:
-      - "db:10.88.0.2"
-      - "redis:10.88.0.3"
+      - "db:10.89.0.2"
+      - "redis:10.89.0.3"
     entrypoint: []
     command: celery -A fundval worker -l ${CELERY_LOGLEVEL:-info}
     volumes:
@@ -108,7 +108,7 @@ services:
         condition: service_healthy
     networks:
       fundval:
-        ipv4_address: 10.88.0.5
+        ipv4_address: 10.89.0.5
 
   celery-beat:
     build:
@@ -117,8 +117,8 @@ services:
     image: fundval-backend:local
     # 2026-06-07 治本组合
     extra_hosts:
-      - "db:10.88.0.2"
-      - "redis:10.88.0.3"
+      - "db:10.89.0.2"
+      - "redis:10.89.0.3"
     entrypoint: []
     command: celery -A fundval beat -l ${CELERY_LOGLEVEL:-info}
     volumes:
@@ -142,7 +142,7 @@ services:
         condition: service_healthy
     networks:
       fundval:
-        ipv4_address: 10.88.0.6
+        ipv4_address: 10.89.0.6
 
   frontend:
     build:
@@ -157,7 +157,7 @@ services:
         condition: service_healthy
     networks:
       fundval:
-        ipv4_address: 10.88.0.7
+        ipv4_address: 10.89.0.7
 
 volumes:
   postgres_data:
@@ -166,9 +166,9 @@ volumes:
 networks:
   fundval:
     driver: bridge
-    # 2026-06-07 治本: 用 ipam 固定子网, 配合 ipv4_address
-    # podman 3.4.4 限制: 不支持 driver: default (你贴的内容提到)
-    # 省略 driver 字段让 podman 用默认 (host-local)
+    # 2026-06-07 治本: 用 ipam 固定子网
+    # noble podman 4.9.3 default net 占用 10.88.0.0/24, 改用 10.89.0.0/24 避开
+    # entrypoint 也要同步改 subnet 扫描范围
     ipam:
       config:
-        - subnet: 10.88.0.0/24
+        - subnet: 10.89.0.0/24
